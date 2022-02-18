@@ -1,0 +1,78 @@
+##################################################################################################
+# edge-proxy service
+##################################################################################################
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bsl-shim-proxy
+data:
+  # property-like keys; each key maps to a simple value
+  endpoint: "https://api.ncr.com/endpoint-does-not-exist" # "https://api.publicapis.org/"
+  proxy-debug: "true"
+---
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  namespace: default
+  name: edge-proxy
+  labels:
+    app: edge-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: edge-proxy
+  template:
+    metadata:
+      labels:
+        app: edge-proxy
+    spec:
+      containers:
+      - env:
+        - name: END_POINT
+          valueFrom:
+            configMapKeyRef:
+              key: endpoint
+              name: bsl-shim-proxy
+        - name: PROXY_DEBUG
+          valueFrom:
+            configMapKeyRef:
+              key: proxy-debug
+              name: bsl-shim-proxy
+        image: todkap/edge-proxy:1.0.0
+        imagePullPolicy: Always
+        name: edge-proxy
+        ports:
+        - containerPort: 9081
+          name: web
+          protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: edge-proxy
+spec:
+  ports:
+    - protocol: TCP
+      name: web
+      port: 9081
+  selector:
+    app: edge-proxy
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: edge-proxy
+spec:
+  rules:
+  - http:
+      paths:
+      - path: /entries
+        pathType: Prefix
+        backend:
+          service:
+            name: edge-proxy
+            port:
+              number: 9081
+
+---
